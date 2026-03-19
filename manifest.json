@@ -1,0 +1,21 @@
+{
+  "name": "Workout Tracker",
+  "short_name": "Workout",
+  "description": "Zero-Server Local-First Workout Tracker PWA",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#bb86fc",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

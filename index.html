@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Workout Tracker</title>
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js" defer></script>
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <h1>Workout Tracker</h1>
+            <nav class="nav-bar">
+                <button class="nav-btn active-nav" data-target="view-home">Home</button>
+                <button class="nav-btn" data-target="view-analytics">Analytics</button>
+                <button class="nav-btn" data-target="view-settings">Settings</button>
+            </nav>
+        </header>
+        <main id="main-content">
+            <!-- Home View -->
+            <div id="view-home" class="view active">
+                <div class="card">
+                    <h2 id="next-split-label">Next Up: Loading...</h2>
+                    <p style="color: var(--secondary-color); font-size: 0.9em; margin-top: 10px;">Progressive Overload
+                        Active</p>
+                </div>
+                <button id="btn-start-workout" class="btn primary-btn">Start Workout</button>
+            </div>
+
+            <!-- Active Workout View -->
+            <div id="view-workout" class="view hidden">
+                <div id="workout-container">
+                    <!-- Exercise inputs will be injected here via JS -->
+                </div>
+                <button id="btn-finish-workout" class="btn success-btn">Save & Complete</button>
+            </div>
+
+            <!-- Analytics View -->
+            <div id="view-analytics" class="view hidden">
+                <div class="card">
+                    <h2>Progress Charts</h2>
+                    <select id="exercise-select" class="dropdown"></select>
+                    <div class="chart-container" style="position: relative; height:40vh; width:100%; margin-top: 15px;">
+                        <canvas id="progress-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="view-settings" class="view hidden">
+                <div class="card">
+                    <h2>Data Management</h2>
+                    <p style="font-size: 0.9em; margin-bottom: 20px;">Your data is strictly on-device.</p>
+                    <button id="btn-export-data" class="btn primary-btn" style="margin-bottom: 15px;">Export App Data
+                        (.json)</button>
+
+                    <div class="import-section"
+                        style="margin-top: 20px; border-top: 1px solid var(--surface-color); padding-top: 20px;">
+                        <label for="input-import-data" class="btn secondary-btn"
+                            style="cursor: pointer; display: block;">Import App Data (.json)</label>
+                        <input type="file" id="input-import-data" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(registration => {
+                    console.log('ServiceWorker registered:', registration.scope);
+                }).catch(err => {
+                    console.log('ServiceWorker registration failed:', err);
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
