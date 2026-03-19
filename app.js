@@ -8,18 +8,29 @@ const DEFAULT_STATE = {
         "decayConstant_lambda": 0.05
     },
     "exerciseDictionary": [
-        { "id": "e1", "name": "Flat Barbell Press", "splitGroup": "A" },
-        { "id": "e2", "name": "Barbell Squat", "splitGroup": "B" }
+        // Split A - Upper
+        { "id": "a_u1", "name": "Barbell Flat Press", "splitGroup": "A", "category": "upper" },
+        { "id": "a_u2", "name": "Dumbbell Flat Press", "splitGroup": "A", "category": "upper" },
+        { "id": "a_u3", "name": "Dumbbell Incline Press", "splitGroup": "A", "category": "upper" },
+        { "id": "a_u4", "name": "Cable Pec Flys", "splitGroup": "A", "category": "upper" },
+        { "id": "a_u5", "name": "Tricep Dips", "splitGroup": "A", "category": "upper", "repsOnly": true },
+        // Split A - Lower/Abs
+        { "id": "a_l1", "name": "Squats", "splitGroup": "A", "category": "lower/abs" },
+        { "id": "a_l2", "name": "Deadlifts", "splitGroup": "A", "category": "lower/abs" },
+        { "id": "a_l3", "name": "Lunge Squats", "splitGroup": "A", "category": "lower/abs" },
+
+        // Split B - Upper
+        { "id": "b_u1", "name": "Pull Ups", "splitGroup": "B", "category": "upper", "repsOnly": true },
+        { "id": "b_u2", "name": "Forearm Cable Curls", "splitGroup": "B", "category": "upper" },
+        { "id": "b_u3", "name": "Dumbbell Shoulder Flys", "splitGroup": "B", "category": "upper" },
+        { "id": "b_u4", "name": "Barbell Curls", "splitGroup": "B", "category": "upper" },
+        // Split B - Lower/Abs (Various ab workouts)
+        { "id": "b_l1", "name": "Crunches", "splitGroup": "B", "category": "lower/abs", "repsOnly": true },
+        { "id": "b_l2", "name": "Hanging Leg Raises", "splitGroup": "B", "category": "lower/abs", "repsOnly": true },
+        { "id": "b_l3", "name": "Planks", "splitGroup": "B", "category": "lower/abs", "repsOnly": true },
+        { "id": "b_l4", "name": "Russian Twists", "splitGroup": "B", "category": "lower/abs", "repsOnly": true }
     ],
-    "workoutHistory": [
-        {
-            "date": "2023-10-24T14:30:00Z",
-            "splitGroup": "A",
-            "sets": [
-                { "exerciseId": "e1", "weight": 135, "reps": 8 }
-            ]
-        }
-    ]
+    "workoutHistory": []
 };
 
 const STORAGE_KEY = 'workoutTrackerState';
@@ -33,7 +44,10 @@ function loadState() {
     try {
         const storedState = localStorage.getItem(STORAGE_KEY);
         if (storedState) {
-            return JSON.parse(storedState);
+            const parsed = JSON.parse(storedState);
+            // Overwrite locally stored dictionary with the latest default to ensure app updates apply
+            parsed.exerciseDictionary = DEFAULT_STATE.exerciseDictionary;
+            return parsed;
         }
     } catch (error) {
         console.error("Error loading state from localStorage:", error);
@@ -86,7 +100,20 @@ function getNextSplitGroup(lastWorkout) {
  * @returns {Array} Array of exercise objects belonging to the split.
  */
 function getExercisesForSplit(dictionary, splitGroup) {
-    return dictionary.filter(ex => ex.splitGroup === splitGroup);
+    const splitEx = dictionary.filter(ex => ex.splitGroup === splitGroup);
+
+    // Group by category
+    const upper = splitEx.filter(ex => ex.category === 'upper');
+    const lowerAbs = splitEx.filter(ex => ex.category === 'lower/abs');
+
+    // Shuffle helper function
+    const shuffle = array => [...array].sort(() => 0.5 - Math.random());
+
+    // Select 3 random upper and 2 random lower/abs
+    const selectedUpper = shuffle(upper).slice(0, 3);
+    const selectedLowerAbs = shuffle(lowerAbs).slice(0, 2);
+
+    return [...selectedUpper, ...selectedLowerAbs];
 }
 
 // --- Logic Engine: Target Generation ---
@@ -204,21 +231,30 @@ function startWorkout(state) {
     container.innerHTML = '';
 
     exercises.forEach(ex => {
-        const targetWeight = calculateTargetWeight(ex.id, state) || 45; // Default to bar if no history
         const targetReps = state.userConfig.targetReps;
+        let weightHtml = '';
+        let targetText = `Target: ${targetReps} reps`;
+
+        if (!ex.repsOnly) {
+            const targetWeight = calculateTargetWeight(ex.id, state) || 45; // Default to bar
+            targetText = `Target: ${Math.round(targetWeight * 10) / 10} lbs × ${targetReps}`;
+            weightHtml = `
+                <div class="input-field">
+                    <label>Weight (lbs)</label>
+                    <input type="number" class="input-weight" data-exercise-id="${ex.id}" placeholder="${Math.round(targetWeight * 10) / 10}" value="${Math.round(targetWeight * 10) / 10}" step="2.5">
+                </div>
+            `;
+        }
 
         const card = document.createElement('div');
         card.className = 'exercise-card';
         card.innerHTML = `
             <div class="exercise-header">
                 <span>${ex.name}</span>
-                <span class="target-badge">Target: ${targetWeight} lbs × ${targetReps}</span>
+                <span class="target-badge">${targetText}</span>
             </div>
             <div class="input-group">
-                <div class="input-field">
-                    <label>Weight (lbs)</label>
-                    <input type="number" class="input-weight" data-exercise-id="${ex.id}" placeholder="${targetWeight}" value="${targetWeight}" step="2.5">
-                </div>
+                ${weightHtml}
                 <div class="input-field">
                     <label>Reps</label>
                     <input type="number" class="input-reps" data-exercise-id="${ex.id}" placeholder="${targetReps}" value="${targetReps}" step="1">
@@ -232,24 +268,27 @@ function startWorkout(state) {
 }
 
 function finishWorkout(state) {
-    const weightInputs = document.querySelectorAll('.input-weight');
     const repsInputs = document.querySelectorAll('.input-reps');
-
     const sets = [];
 
-    for (let i = 0; i < weightInputs.length; i++) {
-        const exerciseId = weightInputs[i].getAttribute('data-exercise-id');
-        const weight = parseFloat(weightInputs[i].value);
-        const reps = parseInt(repsInputs[i].value, 10);
+    repsInputs.forEach(repInput => {
+        const exerciseId = repInput.getAttribute('data-exercise-id');
+        const reps = parseInt(repInput.value, 10);
 
-        if (!isNaN(weight) && !isNaN(reps)) {
-            sets.push({
-                exerciseId: exerciseId,
-                weight: weight,
-                reps: reps
-            });
+        const weightInput = document.querySelector(`.input-weight[data-exercise-id="${exerciseId}"]`);
+        let weight = null;
+        if (weightInput && weightInput.value) {
+            weight = parseFloat(weightInput.value);
         }
-    }
+
+        if (!isNaN(reps)) {
+            const setObj = { exerciseId: exerciseId, reps: reps };
+            if (weight !== null && !isNaN(weight)) {
+                setObj.weight = weight;
+            }
+            sets.push(setObj);
+        }
+    });
 
     if (sets.length > 0) {
         const newWorkout = {
@@ -297,22 +336,25 @@ function handleChartChange(e) {
 }
 
 function updateChart(exerciseId, state) {
-    // Only attempt to render if Chart.js is loaded
     if (typeof Chart === 'undefined') return;
 
     const ctx = document.getElementById('progress-chart').getContext('2d');
 
-    // Filter history for the specific exercise
-    const dataPoints = [];
+    const dataPointsWeight = [];
+    const dataPointsReps = [];
     const labels = [];
+
+    // Check if exercise is reps only
+    const exerciseDef = state.exerciseDictionary.find(e => e.id === exerciseId);
+    const isRepsOnly = exerciseDef ? !!exerciseDef.repsOnly : false;
 
     state.workoutHistory.forEach(workout => {
         const set = workout.sets.find(s => s.exerciseId === exerciseId);
         if (set) {
-            // Format Date for X axis
             const dateObj = new Date(workout.date);
             labels.push(`${dateObj.getMonth() + 1}/${dateObj.getDate()}`);
-            dataPoints.push(set.weight);
+            if (set.weight !== undefined) dataPointsWeight.push(set.weight);
+            if (set.reps !== undefined) dataPointsReps.push(set.reps);
         }
     });
 
@@ -320,28 +362,66 @@ function updateChart(exerciseId, state) {
         chartInstance.destroy();
     }
 
+    const datasets = [];
+
+    // Y1 - Weight (Only if not repsOnly)
+    if (!isRepsOnly) {
+        datasets.push({
+            label: 'Weight (lbs)',
+            data: dataPointsWeight,
+            borderColor: '#f93d3dff',
+            backgroundColor: 'rgba(249, 57, 57, 0.54)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            yAxisID: 'y'
+        });
+    }
+
+    // Y2 - Reps
+    datasets.push({
+        label: 'Reps',
+        data: dataPointsReps,
+        borderColor: '#5c81fbff', // Using the primary color for reps
+        backgroundColor: 'rgba(108, 157, 255, 0.2)',
+        borderWidth: 2,
+        borderDash: isRepsOnly ? [] : [5, 5],
+        tension: 0.3,
+        fill: isRepsOnly, // Only fill if it's the primary graph
+        yAxisID: isRepsOnly ? 'y' : 'y1'
+    });
+
+    const scales = {
+        y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            beginAtZero: false,
+            title: { display: true, text: isRepsOnly ? 'Reps' : 'Weight (lbs)' }
+        }
+    };
+
+    if (!isRepsOnly) {
+        scales.y1 = {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            beginAtZero: true,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Reps' }
+        };
+    }
+
     chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{
-                label: 'Weight (lbs)',
-                data: dataPoints,
-                borderColor: '#f93d3dff',
-                backgroundColor: 'rgba(249, 57, 57, 0.54)',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            }]
+            datasets: datasets
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: false
-                }
-            }
+            scales: scales
         }
     });
 }
