@@ -223,6 +223,49 @@ function renderHome(state) {
     document.getElementById('next-split-label').innerText = `Next Up: Split ${currentSplit}`;
 }
 
+function renderExerciseCard(ex, state, container) {
+    const targetReps = state.userConfig.targetReps;
+    let weightHtml = '';
+    let targetText = `Target: ${targetReps} reps`;
+
+    if (!ex.repsOnly) {
+        const targetWeight = calculateTargetWeight(ex.id, state) || 45; // Default to bar
+        targetText = `Target: ${Math.round(targetWeight * 10) / 10} lbs × ${targetReps}`;
+        weightHtml = `
+            <div class="input-field">
+                <label>Weight (lbs)</label>
+                <input type="number" class="input-weight" data-exercise-id="${ex.id}" placeholder="${Math.round(targetWeight * 10) / 10}" value="${Math.round(targetWeight * 10) / 10}" step="2.5">
+            </div>
+        `;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'exercise-card';
+    card.innerHTML = `
+        <div class="exercise-header">
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-weight: bold; font-size: 1.1em;">${ex.name}</span>
+                <span class="target-badge" style="margin-top: 4px;">${targetText}</span>
+            </div>
+            <button class="remove-btn" aria-label="Remove exercise">×</button>
+        </div>
+        <div class="input-group">
+            ${weightHtml}
+            <div class="input-field">
+                <label>Reps</label>
+                <input type="number" class="input-reps" data-exercise-id="${ex.id}" placeholder="${targetReps}" value="${targetReps}" step="1">
+            </div>
+        </div>
+    `;
+
+    // Add remove functionality
+    card.querySelector('.remove-btn').addEventListener('click', () => {
+        card.remove();
+    });
+
+    container.appendChild(card);
+}
+
 function startWorkout(state) {
     const exercises = getExercisesForSplit(state.exerciseDictionary, currentSplit);
     const container = document.getElementById('workout-container');
@@ -231,38 +274,20 @@ function startWorkout(state) {
     container.innerHTML = '';
 
     exercises.forEach(ex => {
-        const targetReps = state.userConfig.targetReps;
-        let weightHtml = '';
-        let targetText = `Target: ${targetReps} reps`;
-
-        if (!ex.repsOnly) {
-            const targetWeight = calculateTargetWeight(ex.id, state) || 45; // Default to bar
-            targetText = `Target: ${Math.round(targetWeight * 10) / 10} lbs × ${targetReps}`;
-            weightHtml = `
-                <div class="input-field">
-                    <label>Weight (lbs)</label>
-                    <input type="number" class="input-weight" data-exercise-id="${ex.id}" placeholder="${Math.round(targetWeight * 10) / 10}" value="${Math.round(targetWeight * 10) / 10}" step="2.5">
-                </div>
-            `;
-        }
-
-        const card = document.createElement('div');
-        card.className = 'exercise-card';
-        card.innerHTML = `
-            <div class="exercise-header">
-                <span>${ex.name}</span>
-                <span class="target-badge">${targetText}</span>
-            </div>
-            <div class="input-group">
-                ${weightHtml}
-                <div class="input-field">
-                    <label>Reps</label>
-                    <input type="number" class="input-reps" data-exercise-id="${ex.id}" placeholder="${targetReps}" value="${targetReps}" step="1">
-                </div>
-            </div>
-        `;
-        container.appendChild(card);
+        renderExerciseCard(ex, state, container);
     });
+
+    // Populate Add Exercise dropdown
+    const addSelect = document.getElementById('workout-add-select');
+    if (addSelect) {
+        addSelect.innerHTML = '';
+        state.exerciseDictionary.forEach(dictEx => {
+            const option = document.createElement('option');
+            option.value = dictEx.id;
+            option.textContent = dictEx.name;
+            addSelect.appendChild(option);
+        });
+    }
 
     switchView('view-workout');
 }
@@ -476,6 +501,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup Application Event Listeners
     document.getElementById('btn-start-workout').addEventListener('click', () => {
         startWorkout(loadState()); // Fresh state before workout
+    });
+
+    document.getElementById('btn-add-exercise').addEventListener('click', () => {
+        const selectElement = document.getElementById('workout-add-select');
+        const selectedId = selectElement.value;
+        const currentState = loadState();
+        const ex = currentState.exerciseDictionary.find(e => e.id === selectedId);
+
+        if (ex) {
+            const container = document.getElementById('workout-container');
+            renderExerciseCard(ex, currentState, container);
+        }
     });
 
     document.getElementById('btn-finish-workout').addEventListener('click', () => {
