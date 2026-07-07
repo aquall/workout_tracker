@@ -19,9 +19,7 @@ The engineer should initialize the following state object if localStorage.getIte
 {
   "userConfig": {
     "targetReps": 8,
-    "progressionRate_alpha": 2.5,
-    "decayGracePeriod_tau": 10,
-    "decayConstant_lambda": 0.05
+    "progressionRate_alpha": 2.5
   },
   "exerciseDictionary": [
     { "id": "e1", "name": "Flat Barbell Press", "splitGroup": "A" },
@@ -38,7 +36,26 @@ The engineer should initialize the following state object if localStorage.getIte
   ]
 }
 
-3. Core Algorithmic EngineThe application requires a deterministic engine to generate the next workout session.3.1 Split Alternation StateWhen the user initializes a new workout, the system must query workoutHistory.Find the most recent chronological entry.If the last splitGroup was A (e.g., Chest/Tri/Abs), the current session becomes B (e.g., Back/Bi/Legs), and vice versa.Select the subset of exercises from exerciseDictionary that map to the current split.3.2 Target Generation (Progressive Overload & Detraining)For each exercise in the current split, the system must calculate the target weight ($W_{n+1}$) for the upcoming session. The engineer must implement the following discrete step function combined with an exponential decay modifier.Let $W_n$ be the weight lifted in the last recorded session for that specific exercise, $R_{actual}$ be the reps achieved, $R_{target}$ be the global rep goal, and $\Delta t$ be the elapsed time in days since that exercise was last performed.$$W_{n+1} = \left( W_n + \alpha \max(0, R_{actual} - R_{target}) \right) e^{-\lambda \max(0, \Delta t - \tau)}$$Variables (sourced from userConfig):$\alpha$ (Progression Rate): Weight added per surplus rep.$\tau$ (Grace Period): Days elapsed before detraining decay initiates.$\lambda$ (Decay Constant): The rate at which target weight drops after $\tau$ is exceeded.Note for the engineer: Round the final calculated $W_{n+1}$ to the nearest 2.5 or 5.0 increment to match standard gym plate denominations.
+3. Core Algorithmic Engine
+The application requires a deterministic engine to generate the next workout session.
+
+3.1 Split Alternation State
+When the user initializes a new workout, the system must query workoutHistory:
+1. Find the most recent chronological entry.
+2. If the last splitGroup was A (e.g., Chest/Tri/Abs), the current session becomes B (e.g., Back/Bi/Legs), and vice versa.
+3. Select the subset of exercises from exerciseDictionary that map to the current split.
+
+3.2 Target Generation (Progressive Overload)
+For each exercise in the current split, the system must calculate the target weight ($W_{n+1}$) for the upcoming session using the progressive overload formula.
+
+Let $W_n$ be the weight lifted in the last recorded session for that specific exercise, $R_{actual}$ be the reps achieved, and $R_{target}$ be the global rep goal.
+
+$$W_{n+1} = W_n + \alpha \max(0, R_{actual} - R_{target})$$
+
+Variables (sourced from userConfig):
+- $\alpha$ (Progression Rate): Weight added per surplus rep.
+
+Note for the engineer: Round the final calculated $W_{n+1}$ to the nearest 2.5 increment to match standard gym plate denominations.
 
 4. User Interface (UI/UX) RequirementsThe UI must be highly optimized for one-handed mobile use in a gym environment. Use CSS variables for a consistent, high-contrast dark mode theme.
 4.1 ViewsHome / Dashboard:Prominent "Start Workout" button.Label displaying the computed upcoming split (e.g., "Next Up: Split B").Active Workout Screen:Dynamically rendered list of exercises for the current split.Each exercise block displays the computed $W_{target}$ and $R_{target}$.Input fields of type="number" for the user to log actual weight and actual reps."Save & Complete" button that constructs the workout object, appends it to workoutHistory, updates localStorage, and routes back to Home.Analytics (Charts):A <select> dropdown populated by exerciseDictionary.A <canvas> element utilizing Chart.js to render a line graph.X-axis: Date. Y-axis: Weight logged.Settings (Data Management):Export Data: Button that serializes the current localStorage state to a .json blob and triggers a browser download.Import Data: A file input that accepts a .json file, parses it, validates the schema, and overwrites localStorage (acting as the backup/restore mechanism).

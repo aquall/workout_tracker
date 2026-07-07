@@ -3,9 +3,7 @@
 const DEFAULT_STATE = {
     "userConfig": {
         "targetReps": 8,
-        "progressionRate_alpha": 2.5,
-        "decayGracePeriod_tau": 10,
-        "decayConstant_lambda": 0.05
+        "progressionRate_alpha": 2.5
     },
     "exerciseDictionary": [
         // Split A - Upper
@@ -119,31 +117,15 @@ function getExercisesForSplit(dictionary, splitGroup) {
 // --- Logic Engine: Target Generation ---
 
 /**
- * Calculates the number of days elapsed between a past date and now.
- * @param {string} pastDateString - ISO 8601 date string.
- * @param {string} [nowDateString] - Optional current date string for testing.
- * @returns {number} Days elapsed (\Delta t).
- */
-function calculateDaysElapsed(pastDateString, nowDateString = new Date().toISOString()) {
-    const past = new Date(pastDateString);
-    const now = new Date(nowDateString);
-    const diffMs = now - past;
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return Math.max(0, diffDays); // Ensure no negative days if dates are weird
-}
-
-/**
- * Calculates the target weight for the next session using the progressive overload with decay formula:
- * W_{n+1} = (W_n + \alpha * max(0, R_{actual} - R_{target})) * e^{-\lambda * max(0, \Delta t - \tau)}
+ * Calculates the target weight for the next session using the progressive overload formula:
+ * W_{n+1} = W_n + \alpha * max(0, R_{actual} - R_{target})
  * 
  * @param {string} exerciseId - The ID of the exercise to calculate for.
  * @param {Object} state - The current application state.
- * @param {string} [nowDateString] - Optional current date string for calculating elapsed time (used for testing).
  * @returns {number|null} The calculated target weight, rounded to nearest 2.5, or null if no history exists.
  */
-function calculateTargetWeight(exerciseId, state, nowDateString = new Date().toISOString()) {
+function calculateTargetWeight(exerciseId, state) {
     // 1. Find the most recent performance for this exercise in history
-    let lastPerformanceDate = null;
     let W_n = null; // Last weight
     let R_actual = null; // Last reps achieved
 
@@ -154,7 +136,6 @@ function calculateTargetWeight(exerciseId, state, nowDateString = new Date().toI
         if (set) {
             W_n = set.weight;
             R_actual = set.reps;
-            lastPerformanceDate = workout.date;
             break;
         }
     }
@@ -162,50 +143,17 @@ function calculateTargetWeight(exerciseId, state, nowDateString = new Date().toI
     // If we have no history for this exercise, we can't calculate a target
     if (W_n === null) return null;
 
-    // 2. Calculate \Delta t
-    const delta_t = calculateDaysElapsed(lastPerformanceDate, nowDateString);
-
-    // 3. Extract user variables
+    // 2. Extract user variables
     const alpha = state.userConfig.progressionRate_alpha;
-    const tau = state.userConfig.decayGracePeriod_tau;
-    const lambda = state.userConfig.decayConstant_lambda;
     const R_target = state.userConfig.targetReps;
 
-    // 4. Evaluate the formula
-    const progressiveOverload = W_n + alpha * Math.max(0, R_actual - R_target);
-    const exponentialDecay = Math.exp(-lambda * Math.max(0, delta_t - tau));
+    // 3. Evaluate the formula
+    const W_next = W_n + alpha * Math.max(0, R_actual - R_target);
 
-    let W_next = progressiveOverload * exponentialDecay;
-
-    // 5. Round to nearest 2.5 increment
+    // 4. Round to nearest 2.5 increment
     return Math.round(W_next / 2.5) * 2.5;
 }
 
-// --- Testing ---
-
-/**
- * Runs temporary sanity checks in the console.
- * @param {Object} state - Application state.
- */
-function runLogicTests(state) {
-    console.log("--- Running Logic Engine Tests ---");
-
-    const lastWorkout = getLastWorkout(state.workoutHistory);
-    const nextSplit = getNextSplitGroup(lastWorkout);
-    console.log(`Last Split: ${lastWorkout ? lastWorkout.splitGroup : 'None'} -> Next Split: ${nextSplit}`);
-
-    const exercisesForA = getExercisesForSplit(state.exerciseDictionary, "A");
-    console.log(`Exercises for Split A:`, exercisesForA.map(e => e.name));
-
-    // Test Target Weight generation for "Flat Barbell Press" (e1)
-    // History has it at 135 for 8 reps (equals target) on 2023-10-24
-    const testDateRecent = new Date("2023-10-25T14:30:00Z").toISOString(); // 1 day elapsed
-    const testDateFar = new Date("2023-11-24T14:30:00Z").toISOString(); // 31 days elapsed (triggers decay)
-
-    console.log(`Test Target Weight (1 day elapsed, 8 reps achieved):`, calculateTargetWeight("e1", state, testDateRecent)); // Should be 135
-    console.log(`Test Target Weight (31 days elapsed, 8 reps achieved):`, calculateTargetWeight("e1", state, testDateFar)); // Should be lower than 135
-    console.log("----------------------------------");
-}
 
 // --- UI & DOM Manipulation ---
 
